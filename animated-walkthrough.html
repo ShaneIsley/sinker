@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sinker — Interactive Code Walkthrough</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #21262d;
+    --border:    #30363d;
+    --text:      #c9d1d9;
+    --text-dim:  #8b949e;
+    --text-hi:   #e6edf3;
+    --green:     #238636;
+    --green-hi:  #2ea043;
+    --green-glow:#3fb950;
+    --blue:      #388bfd;
+    --blue-hi:   #58a6ff;
+    --red:       #f85149;
+    --yellow:    #d29922;
+    --purple:    #8957e5;
+    --font: -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;
+    --mono: "SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  #header {
+    flex-shrink: 0;
+    padding: 16px 24px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  #header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-hi);
+  }
+  #header .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* Scene dots */
+  #dots {
+    display: flex;
+    gap: 8px;
+    margin: 0 auto;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .2s, transform .2s;
+  }
+  .dot.active {
+    background: var(--blue);
+    border-color: var(--blue);
+    transform: scale(1.25);
+  }
+
+  /* Nav buttons */
+  .nav-btn {
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .nav-btn:hover { background: #2d333b; }
+  .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Scene container */
+  #scenes {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    overflow-y: auto;
+    opacity: 0;
+    transform: translateX(60px);
+    pointer-events: none;
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  .scene.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+  }
+  .scene.exit-left {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+
+  .scene-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-hi);
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .scene-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  /* ── Shared components ──────────────────────────────────────────────── */
+  .code-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: rgba(56,139,253,.12);
+    border: 1px solid rgba(56,139,253,.3);
+    color: var(--blue-hi);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .badge-green {
+    font-size: 11px;
+    background: rgba(35,134,54,.15);
+    border: 1px solid rgba(35,134,54,.4);
+    color: var(--green-glow);
+    padding: 1px 8px;
+    border-radius: 10px;
+  }
+
+  .play-btn {
+    padding: 5px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--blue);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+  .play-btn:hover { background: #58a6ff; }
+  .play-btn:active { transform: scale(.97); }
+
+  /* ── Scene 1: Pipeline ───────────────────────────────────────────────── */
+  #pipeline-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    position: relative;
+    width: 340px;
+  }
+
+  .pipe-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0;
+  }
+
+  .pipe-box {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    position: relative;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity .3s, transform .3s, border-color .2s, background .2s;
+  }
+  .pipe-box.visible { opacity: 1; transform: translateX(0); }
+  .pipe-box:hover {
+    border-color: var(--blue);
+    background: #1c2333;
+  }
+
+  .pipe-box .sec-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    width: 20px;
+    flex-shrink: 0;
+  }
+  .pipe-box .sec-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-hi);
+  }
+  .pipe-box .sec-icon {
+    margin-left: auto;
+    font-size: 15px;
+  }
+
+  .pipe-tooltip {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #1c2333;
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .15s;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  }
+  .pipe-box:hover .pipe-tooltip { opacity: 1; }
+
+  .pipe-connector {
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--border), transparent);
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+  }
+  .pipe-connector::after {
+    content: '';
+    position: absolute;
+    top: -100%;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent, var(--blue), transparent);
+    animation: flowDown 2s linear infinite;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  .pipe-connector.active::after { opacity: 1; }
+
+  @keyframes flowDown {
+    from { top: -100%; }
+    to   { top: 100%; }
+  }
+
+  #pipeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  /* ── Scene 2: URL Detection ─────────────────────────────────────────── */
+  #url-scene {
+    width: 100%;
+    max-width: 620px;
+  }
+
+  .url-bar {
+    display: flex;
+    align-items: center;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    gap: 10px;
+    margin-bottom: 20px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .url-bar .lock { color: var(--green-glow); font-size: 14px; }
+
+  .url-part {
+    display: inline;
+    transition: background .3s, color .3s;
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+  .url-part.hl-scheme  { color: var(--text-dim); }
+  .url-part.hl-host    { color: var(--blue-hi); background: rgba(56,139,253,.12); }
+  .url-part.hl-owner   { color: var(--green-glow); background: rgba(63,185,80,.1); }
+  .url-part.hl-repo    { color: var(--yellow); background: rgba(210,153,34,.1); }
+
+  .detection-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .det-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .4s, transform .4s, border-color .3s;
+  }
+  .det-step.visible { opacity: 1; transform: translateY(0); }
+  .det-step.matched { border-color: var(--green); }
+
+  .det-arrow {
+    color: var(--text-dim);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .det-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    width: 130px;
+    flex-shrink: 0;
+  }
+  .det-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+  .det-result {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity .4s;
+  }
+  .det-result.show { opacity: 1; }
+  .det-result.ok   { color: var(--green-glow); }
+  .det-result.val  { color: var(--blue-hi); }
+  .det-result.warn { color: var(--yellow); }
+
+  .url-controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .url-example-btn {
+    padding: 4px 12px;
+    font-size: 11px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background .15s;
+    font-family: var(--mono);
+  }
+  .url-example-btn:hover { background: #2d333b; }
+  .url-example-btn.active { border-color: var(--blue); color: var(--blue-hi); }
+
+  /* ── Scene 3: Payload Builder ───────────────────────────────────────── */
+  #payload-scene {
+    width: 100%;
+    max-width: 680px;
+    display: flex;
+    gap: 20px;
+  }
+
+  .payload-inputs {
+    flex: 0 0 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .p-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-bottom: 3px;
+  }
+  .p-field input, .p-field select {
+    width: 100%;
+    padding: 5px 8px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    outline: none;
+  }
+  .p-field input:focus, .p-field select:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(56,139,253,.2);
+  }
+
+  .caps-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .cap-check {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .cap-check input { margin: 0; cursor: pointer; }
+
+  .payload-output {
+    flex: 1;
+    min-width: 0;
+  }
+  .payload-output h3 {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #payload-json {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    overflow: auto;
+    max-height: 380px;
+  }
+
+  .j-key   { color: var(--blue-hi); }
+  .j-str   { color: #a5d6ff; }
+  .j-bool  { color: #ff7b72; }
+  .j-num   { color: #79c0ff; }
+  .j-new   { animation: flashLine .6s ease; }
+
+  @keyframes flashLine {
+    0%   { background: rgba(56,139,253,.25); }
+    100% { background: transparent; }
+  }
+
+  /* ── Scene 4: Button Injection ──────────────────────────────────────── */
+  #inject-scene {
+    width: 100%;
+    max-width: 680px;
+  }
+
+  .gh-mockup {
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .gh-topbar {
+    background: #161b22;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .gh-logo { color: var(--text); font-size: 18px; }
+  .gh-crumbs {
+    font-size: 13px;
+    color: var(--blue-hi);
+    font-family: var(--mono);
+  }
+  .gh-crumbs span { color: var(--text-dim); }
+
+  .gh-repo-header {
+    padding: 12px 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .gh-repo-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--blue-hi);
+    margin-bottom: 10px;
+  }
+
+  .gh-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .gh-stock-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--bg3);
+    border: 1px solid rgba(240,246,252,.1);
+    border-radius: 6px;
+    cursor: default;
+  }
+  .gh-stock-btn .count {
+    background: rgba(240,246,252,.08);
+    border-radius: 10px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+
+  #gtm-inject-group {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid rgba(240,246,252,.1);
+    border-radius: 6px;
+    opacity: 0;
+    transform: scale(.85);
+    transition: opacity .4s, transform .4s;
+  }
+  #gtm-inject-group.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+  #gtm-inject-group button {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--bg3);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    transition: background .15s;
+  }
+  #gtm-inject-group button:hover { background: #2d333b; }
+  #gtm-main-btn { border-radius: 5px 0 0 5px; }
+  #gtm-chev-btn {
+    border-radius: 0 5px 5px 0;
+    border-left: 1px solid rgba(240,246,252,.1);
+    padding: 3px 6px;
+  }
+
+  #gtm-main-btn.state-loading { opacity: .7; }
+  #gtm-main-btn.state-success { background: var(--green) !important; color: #fff !important; }
+  #gtm-main-btn.state-error   { background: #da3633 !important; color: #fff !important; }
+
+  .inject-steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .inject-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color .2s;
+  }
+  .inject-step:hover { border-color: var(--blue); }
+  .inject-step.active { border-color: var(--blue); background: #1c2333; }
+  .inject-step .step-num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    color: var(--text-dim);
+    transition: background .2s, border-color .2s, color .2s;
+  }
+  .inject-step.active .step-num {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+  .inject-step .step-desc { color: var(--text); line-height: 1.4; }
+
+  .state-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .state-btn {
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    background: var(--bg3);
+    color: var(--text);
+    transition: background .15s;
+  }
+  .state-btn:hover { background: #2d333b; }
+  .state-btn.s-loading { border-color: var(--blue); color: var(--blue-hi); }
+  .state-btn.s-success { border-color: var(--green); color: var(--green-glow); }
+  .state-btn.s-error   { border-color: var(--red); color: var(--red); }
+
+  /* ── Scene 5: Full Flow ──────────────────────────────────────────────── */
+  #flow-scene {
+    width: 100%;
+    max-width: 680px;
+  }
+
+  .flow-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+  .flow-tab {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+  }
+  .flow-tab:hover { color: var(--text); }
+  .flow-tab.active { color: var(--text-hi); border-bottom-color: var(--blue); }
+
+  .flow-view { display: none; }
+  .flow-view.active { display: block; }
+
+  .call-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .call-node {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    opacity: 0;
+    transform: translateX(-16px);
+    transition: opacity .35s, transform .35s;
+  }
+  .call-node.visible { opacity: 1; transform: translateX(0); }
+
+  .call-indent {
+    width: 20px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .call-indent::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: -10px;
+    bottom: 10px;
+    width: 1px;
+    background: var(--border);
+  }
+  .call-indent::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    width: 10px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .call-box {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-family: var(--mono);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color .2s, background .2s;
+    cursor: default;
+    margin: 2px 0;
+  }
+  .call-box.fn   { color: var(--blue-hi); }
+  .call-box.info { color: var(--text-dim); font-style: italic; font-family: var(--font); font-size: 11px; }
+  .call-box.ok   { border-color: var(--green); color: var(--green-glow); }
+  .call-box.err  { border-color: var(--red); color: var(--red); }
+  .call-box.api  { border-color: rgba(138,87,229,.5); color: #c9b1ff; }
+
+  .call-result {
+    margin-left: auto;
+    font-family: var(--font);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .flow-controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--blue);
+    border-radius: 2px;
+    width: 0%;
+    transition: width .3s;
+  }
+
+  /* ── Tooltip / popup ─────────────────────────────────────────────────── */
+  #tooltip {
+    position: fixed;
+    background: #1c2333;
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .15s;
+    z-index: 1000;
+    max-width: 240px;
+    line-height: 1.4;
+  }
+  #tooltip.show { opacity: 1; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header / nav -->
+  <div id="header">
+    <div>
+      <h1>Sinker &mdash; Animated Code Walkthrough</h1>
+      <div class="sub">github → gitea mirror userscript &bull; 846 lines &bull; zero dependencies</div>
+    </div>
+    <div id="dots">
+      <div class="dot active" data-scene="0" title="§1–10 Pipeline"></div>
+      <div class="dot" data-scene="1" title="URL Detection"></div>
+      <div class="dot" data-scene="2" title="Payload Builder"></div>
+      <div class="dot" data-scene="3" title="Button Injection"></div>
+      <div class="dot" data-scene="4" title="Full Flow"></div>
+    </div>
+    <button class="nav-btn" id="prev-btn" disabled>← Prev</button>
+    <button class="nav-btn" id="next-btn">Next →</button>
+  </div>
+
+  <!-- Scenes -->
+  <div id="scenes">
+
+    <!-- ═══ SCENE 1: Architecture Pipeline ═══════════════════════════════ -->
+    <div class="scene active" id="scene-0">
+      <div class="scene-title">§1–10 · Architecture Overview</div>
+      <div class="scene-sub">Ten sections work as a linear pipeline — each builds on the last.</div>
+
+      <div id="pipeline-wrap">
+        <!-- filled by JS -->
+      </div>
+
+      <div id="pipeline-controls">
+        <button class="play-btn" id="play-pipeline">▶ Replay Animation</button>
+        <span style="font-size:11px;color:var(--text-dim)">Hover each block for its role</span>
+      </div>
+    </div>
+
+    <!-- ═══ SCENE 2: URL Detection ════════════════════════════════════════ -->
+    <div class="scene" id="scene-1">
+      <div class="scene-title">§1 Provider Registry · URL Detection</div>
+      <div class="scene-sub">How a GitHub URL is parsed into repo info — and why only repo pages get the button.</div>
+
+      <div id="url-scene">
+        <div class="url-bar">
+          <span class="lock">🔒</span>
+          <span id="url-display" style="font-family:var(--mono);font-size:13px;"></span>
+        </div>
+
+        <div class="detection-flow" id="det-flow">
+          <div class="det-step" id="det-host">
+            <div class="det-arrow">▸</div>
+            <div class="det-label">hostname</div>
+            <div class="det-value" id="det-host-val">—</div>
+            <div class="det-result" id="det-host-res">GitHub ✓</div>
+          </div>
+          <div class="det-step" id="det-parts">
+            <div class="det-arrow">▸</div>
+            <div class="det-label">pathname.split('/')</div>
+            <div class="det-value" id="det-parts-val">—</div>
+            <div class="det-result" id="det-parts-res">2 parts ✓</div>
+          </div>
+          <div class="det-step" id="det-owner">
+            <div class="det-arrow">▸</div>
+            <div class="det-label">owner</div>
+            <div class="det-value" id="det-owner-val">—</div>
+            <div class="det-result" id="det-owner-res"></div>
+          </div>
+          <div class="det-step" id="det-repo">
+            <div class="det-arrow">▸</div>
+            <div class="det-label">repo</div>
+            <div class="det-value" id="det-repo-val">—</div>
+            <div class="det-result" id="det-repo-res"></div>
+          </div>
+          <div class="det-step" id="det-clone">
+            <div class="det-arrow">▸</div>
+            <div class="det-label">clone URL</div>
+            <div class="det-value" id="det-clone-val" style="font-size:11px;word-break:break-all;">—</div>
+            <div class="det-result" id="det-clone-res"></div>
+          </div>
+        </div>
+
+        <div class="url-controls">
+          <span style="font-size:11px;color:var(--text-dim)">Try:</span>
+          <button class="url-example-btn active" data-url="https://github.com/torvalds/linux">torvalds/linux</button>
+          <button class="url-example-btn" data-url="https://github.com/anthropics/anthropic-sdk-python">anthropics/anthropic-sdk-python</button>
+          <button class="url-example-btn" data-url="https://github.com/torvalds/linux/blob/master/Makefile">deep path (rejected)</button>
+          <button class="url-example-btn" data-url="https://github.com/settings/tokens">settings (rejected)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SCENE 3: Payload Builder ══════════════════════════════════════ -->
+    <div class="scene" id="scene-2">
+      <div class="scene-title">§5 buildDefaultPayload() · Live API Payload</div>
+      <div class="scene-sub">Edit the fields to see the JSON body that will be sent to <span class="code-tag">POST /api/v1/repos/migrate</span></div>
+
+      <div id="payload-scene">
+        <div class="payload-inputs">
+          <div class="p-field">
+            <label>Gitea URL</label>
+            <input type="text" id="p-gitea-url" value="https://gitea.example.com">
+          </div>
+          <div class="p-field">
+            <label>Destination Owner</label>
+            <input type="text" id="p-owner" value="myusername">
+          </div>
+          <div class="p-field">
+            <label>GitHub Owner</label>
+            <input type="text" id="p-gh-owner" value="torvalds">
+          </div>
+          <div class="p-field">
+            <label>GitHub Repo</label>
+            <input type="text" id="p-gh-repo" value="linux">
+          </div>
+          <div class="p-field">
+            <label>Mirror Interval</label>
+            <select id="p-interval">
+              <option value="10m">Every 10 min</option>
+              <option value="1h">Every hour</option>
+              <option value="8h" selected>Every 8 hours</option>
+              <option value="24h">Daily</option>
+              <option value="168h0m0s">Weekly</option>
+            </select>
+          </div>
+          <div class="p-field">
+            <label>Capabilities</label>
+            <div class="caps-grid">
+              <label class="cap-check"><input type="checkbox" class="cap-cb" data-key="wiki" checked> Wiki</label>
+              <label class="cap-check"><input type="checkbox" class="cap-cb" data-key="issues" checked> Issues</label>
+              <label class="cap-check"><input type="checkbox" class="cap-cb" data-key="labels" checked> Labels</label>
+              <label class="cap-check"><input type="checkbox" class="cap-cb" data-key="milestones" checked> Milestones</label>
+              <label class="cap-check"><input type="checkbox" class="cap-cb" data-key="pull_requests" checked> Pull Requests</label>
+              <label class="cap-check"><input type="checkbox" class="cap-cb" data-key="releases" checked> Releases</label>
+              <label class="cap-check"><input type="checkbox" class="cap-cb" data-key="lfs" checked> Git LFS</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="payload-output">
+          <h3>
+            <span>JSON Body</span>
+            <span class="badge-green" id="payload-status">live</span>
+          </h3>
+          <pre id="payload-json"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SCENE 4: Button Injection ════════════════════════════════════ -->
+    <div class="scene" id="scene-3">
+      <div class="scene-title">§6 injectSplitButton() · Button Lifecycle</div>
+      <div class="scene-sub">Step through how the button is injected into GitHub's toolbar and how it responds to API results.</div>
+
+      <div id="inject-scene">
+        <!-- GitHub mockup -->
+        <div class="gh-mockup">
+          <div class="gh-topbar">
+            <span class="gh-logo">⬡</span>
+            <span class="gh-crumbs">torvalds <span>/</span> linux</span>
+          </div>
+          <div class="gh-repo-header">
+            <div class="gh-repo-title">📦 linux <span class="badge-green">Public</span></div>
+            <div class="gh-actions" id="gh-actions-bar">
+              <div class="gh-stock-btn">👁 Watch <span class="count">3.1k</span></div>
+              <div class="gh-stock-btn">⑂ Fork <span class="count">45.2k</span></div>
+              <div class="gh-stock-btn">★ Star <span class="count">182k</span></div>
+              <div id="gtm-inject-group">
+                <button id="gtm-main-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                  Mirror to Gitea
+                </button>
+                <button id="gtm-chev-btn">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 1.5L7 5 3 8.5"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="inject-steps" id="inject-steps">
+          <!-- filled by JS -->
+        </div>
+
+        <!-- State demo -->
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Simulate button feedback states:</div>
+        <div class="state-btns">
+          <button class="state-btn" id="sb-reset">Default</button>
+          <button class="state-btn s-loading" id="sb-loading">Loading</button>
+          <button class="state-btn s-success" id="sb-success">Success</button>
+          <button class="state-btn s-error" id="sb-error">Error</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SCENE 5: Full Flow ════════════════════════════════════════════ -->
+    <div class="scene" id="scene-4">
+      <div class="scene-title">§10 init() · The Complete Flow</div>
+      <div class="scene-sub">Step through every function call from page load to a mirrored repo.</div>
+
+      <div id="flow-scene">
+        <div class="flow-tabs">
+          <div class="flow-tab active" data-flow="happy">Happy path (public repo)</div>
+          <div class="flow-tab" data-flow="firstrun">First-run setup</div>
+          <div class="flow-tab" data-flow="private">Private repo</div>
+          <div class="flow-tab" data-flow="spa">SPA navigation</div>
+        </div>
+
+        <div class="flow-view active" id="flow-happy">
+          <div class="call-stack" id="cs-happy"></div>
+        </div>
+        <div class="flow-view" id="flow-firstrun">
+          <div class="call-stack" id="cs-firstrun"></div>
+        </div>
+        <div class="flow-view" id="flow-private">
+          <div class="call-stack" id="cs-private"></div>
+        </div>
+        <div class="flow-view" id="flow-spa">
+          <div class="call-stack" id="cs-spa"></div>
+        </div>
+
+        <div class="flow-controls">
+          <button class="play-btn" id="play-flow">▶ Play</button>
+          <div class="progress-bar"><div class="progress-fill" id="flow-progress"></div></div>
+          <span id="flow-step-label" style="font-size:11px;color:var(--text-dim);white-space:nowrap;">step 0 / 0</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /scenes -->
+</div><!-- /app -->
+
+<div id="tooltip"></div>
+
+<script>
+'use strict';
+
+// ── Utilities ───────────────────────────────────────────────────────────
+function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+// ── Navigation ──────────────────────────────────────────────────────────
+let currentScene = 0;
+const TOTAL = 5;
+const prevBtn = document.getElementById('prev-btn');
+const nextBtn = document.getElementById('next-btn');
+const dots    = document.querySelectorAll('.dot');
+const scenes  = document.querySelectorAll('.scene');
+
+function goScene(n) {
+  if (n < 0 || n >= TOTAL) return;
+  const old = currentScene;
+  scenes[old].classList.add('exit-left');
+  setTimeout(() => { scenes[old].classList.remove('active','exit-left'); }, 350);
+  scenes[n].classList.add('active');
+  dots[old].classList.remove('active');
+  dots[n].classList.add('active');
+  currentScene = n;
+  prevBtn.disabled = n === 0;
+  nextBtn.disabled = n === TOTAL - 1;
+  onSceneEnter(n);
+}
+
+prevBtn.addEventListener('click', () => goScene(currentScene - 1));
+nextBtn.addEventListener('click', () => goScene(currentScene + 1));
+dots.forEach(d => d.addEventListener('click', () => goScene(+d.dataset.scene)));
+
+function onSceneEnter(n) {
+  if (n === 0) runPipeline();
+  if (n === 1) runUrlDetection(currentUrl);
+  if (n === 2) updatePayload();
+  if (n === 3) resetInjection(); setTimeout(()=>runInjection(), 300);
+  if (n === 4) { selectFlow(currentFlow); }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// SCENE 1 — Pipeline
+// ════════════════════════════════════════════════════════════════════════
+
+const SECTIONS = [
+  { num:'§1',  name:'Provider Registry',  icon:'🔌', tip:'Detects which git forge is loaded; holds per-provider data objects' },
+  { num:'§2',  name:'Styles',             icon:'🎨', tip:'Injects all CSS via GM_addStyle(); scoped to #gtm-* selectors' },
+  { num:'§3',  name:'Persistent Config',  icon:'💾', tip:'Reads/writes settings with GM_getValue/GM_setValue; never localStorage' },
+  { num:'§4',  name:'Gitea API Transport',icon:'🌐', tip:'GM_xmlhttpRequest wrapper that bypasses CORS; resolves as a Promise' },
+  { num:'§5',  name:'Utility Functions',  icon:'🛠', tip:'XSS-safe escHTML(), safeUrl(), buildDefaultPayload() and helpers' },
+  { num:'§6',  name:'Split Button',       icon:'🔘', tip:'Injects the Mirror/chevron button group into GitHub\'s toolbar' },
+  { num:'§7',  name:'Quick Mirror',       icon:'⚡', tip:'One-click flow: public repos fire immediately; private prompt for token' },
+  { num:'§8',  name:'Settings Modal',     icon:'⚙️', tip:'Full config UI opened by the chevron; saves to GM storage' },
+  { num:'§9',  name:'First-Run Modal',    icon:'🚀', tip:'Setup wizard shown on first click; collects Gitea creds and mirrors immediately' },
+  { num:'§10', name:'Bootstrap + SPA',    icon:'🔄', tip:'init() + MutationObserver to re-inject button after Turbo navigation' },
+];
+
+const pipeWrap = document.getElementById('pipeline-wrap');
+let pipelineRunning = false;
+
+function buildPipeline() {
+  pipeWrap.innerHTML = '';
+  SECTIONS.forEach((s, i) => {
+    if (i > 0) {
+      const conn = document.createElement('div');
+      conn.className = 'pipe-connector';
+      conn.id = `conn-${i}`;
+      pipeWrap.appendChild(conn);
+    }
+    const row = document.createElement('div');
+    row.className = 'pipe-row';
+    row.innerHTML = `
+      <div class="pipe-box" id="pipe-${i}">
+        <span class="sec-num">${esc(s.num)}</span>
+        <span class="sec-name">${esc(s.name)}</span>
+        <span class="sec-icon">${s.icon}</span>
+        <div class="pipe-tooltip">${esc(s.tip)}</div>
+      </div>`;
+    pipeWrap.appendChild(row);
+  });
+}
+
+async function runPipeline() {
+  if (pipelineRunning) return;
+  pipelineRunning = true;
+  buildPipeline();
+  // Reset connectors
+  document.querySelectorAll('.pipe-connector').forEach(c => c.classList.remove('active'));
+  await sleep(100);
+  for (let i = 0; i < SECTIONS.length; i++) {
+    const box = document.getElementById(`pipe-${i}`);
+    if (box) box.classList.add('visible');
+    await sleep(150);
+    if (i > 0) {
+      const conn = document.getElementById(`conn-${i}`);
+      if (conn) conn.classList.add('active');
+    }
+  }
+  pipelineRunning = false;
+}
+
+document.getElementById('play-pipeline').addEventListener('click', () => runPipeline());
+buildPipeline();
+setTimeout(runPipeline, 400);
+
+// ════════════════════════════════════════════════════════════════════════
+// SCENE 2 — URL Detection
+// ════════════════════════════════════════════════════════════════════════
+
+let currentUrl = 'https://github.com/torvalds/linux';
+let urlAnimRunning = false;
+
+function renderUrlBar(url) {
+  let display = '';
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.replace(/^\/|\/$/g,'').split('/').filter(Boolean);
+    display = `<span class="url-part hl-scheme">${esc(u.protocol)}//</span>`;
+    display += `<span class="url-part hl-host">${esc(u.hostname)}</span>`;
+    if (parts[0]) display += `/<span class="url-part hl-owner">${esc(parts[0])}</span>`;
+    if (parts[1]) display += `/<span class="url-part hl-repo">${esc(parts[1])}</span>`;
+    if (parts.length > 2) display += `/${esc(parts.slice(2).join('/'))}`;
+    display += esc(u.search) + esc(u.hash);
+  } catch {
+    display = esc(url);
+  }
+  document.getElementById('url-display').innerHTML = display;
+}
+
+async function runUrlDetection(url) {
+  if (urlAnimRunning) return;
+  urlAnimRunning = true;
+
+  renderUrlBar(url);
+
+  // Reset steps
+  const steps = ['det-host','det-parts','det-owner','det-repo','det-clone'];
+  steps.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('visible','matched');
+    el.querySelector('.det-result').classList.remove('show','ok','val','warn');
+    el.querySelector('.det-value').textContent = '—';
+  });
+
+  await sleep(200);
+
+  let host, parts, owner, repo, valid = true;
+
+  try {
+    const u = new URL(url);
+    host = u.hostname;
+    const rawParts = u.pathname.replace(/^\/|\/$/g,'').split('/').filter(Boolean);
+    parts = rawParts;
+    owner = rawParts[0] || '';
+    repo  = rawParts[1] || '';
+  } catch { valid = false; }
+
+  // Step 1: hostname
+  await sleep(200);
+  const stepHost = document.getElementById('det-host');
+  stepHost.classList.add('visible');
+  document.getElementById('det-host-val').textContent = host || '—';
+  await sleep(400);
+  const hostRes = document.getElementById('det-host-res');
+  if (host === 'github.com') {
+    hostRes.textContent = 'GitHub ✓';
+    hostRes.className = 'det-result show ok';
+    stepHost.classList.add('matched');
+  } else {
+    hostRes.textContent = 'No match ✗';
+    hostRes.className = 'det-result show warn';
+    urlAnimRunning = false;
+    return;
+  }
+
+  // Step 2: pathname parts
+  await sleep(400);
+  const stepParts = document.getElementById('det-parts');
+  stepParts.classList.add('visible');
+  document.getElementById('det-parts-val').textContent = parts ? `[${parts.map(p=>`"${p}"`).join(', ')}]` : '—';
+  await sleep(400);
+  const partsRes = document.getElementById('det-parts-res');
+  if (parts && parts.length === 2) {
+    partsRes.textContent = '2 parts ✓';
+    partsRes.className = 'det-result show ok';
+    stepParts.classList.add('matched');
+  } else {
+    partsRes.textContent = `${parts ? parts.length : 0} parts ✗ (need exactly 2)`;
+    partsRes.className = 'det-result show warn';
+    urlAnimRunning = false;
+    return;
+  }
+
+  // Step 3: owner
+  await sleep(400);
+  const stepOwner = document.getElementById('det-owner');
+  stepOwner.classList.add('visible');
+  document.getElementById('det-owner-val').textContent = owner;
+  await sleep(300);
+  const ownerRes = document.getElementById('det-owner-res');
+  ownerRes.textContent = `"${owner}"`;
+  ownerRes.className = 'det-result show val';
+  stepOwner.classList.add('matched');
+
+  // Step 4: repo
+  await sleep(400);
+  const stepRepo = document.getElementById('det-repo');
+  stepRepo.classList.add('visible');
+  document.getElementById('det-repo-val').textContent = repo;
+  await sleep(300);
+  const repoRes = document.getElementById('det-repo-res');
+  repoRes.textContent = `"${repo}"`;
+  repoRes.className = 'det-result show val';
+  stepRepo.classList.add('matched');
+
+  // Step 5: clone URL
+  await sleep(400);
+  const stepClone = document.getElementById('det-clone');
+  stepClone.classList.add('visible');
+  const cloneUrl = `https://github.com/${owner}/${repo}.git`;
+  document.getElementById('det-clone-val').textContent = cloneUrl;
+  await sleep(300);
+  const cloneRes = document.getElementById('det-clone-res');
+  cloneRes.textContent = '✓';
+  cloneRes.className = 'det-result show ok';
+  stepClone.classList.add('matched');
+
+  urlAnimRunning = false;
+}
+
+// URL example buttons
+document.querySelectorAll('.url-example-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.url-example-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentUrl = btn.dataset.url;
+    runUrlDetection(currentUrl);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// SCENE 3 — Payload Builder
+// ════════════════════════════════════════════════════════════════════════
+
+function getPayload() {
+  const giteaUrl  = document.getElementById('p-gitea-url').value.trim().replace(/\/+$/,'');
+  const destOwner = document.getElementById('p-owner').value.trim();
+  const ghOwner   = document.getElementById('p-gh-owner').value.trim();
+  const ghRepo    = document.getElementById('p-gh-repo').value.trim();
+  const interval  = document.getElementById('p-interval').value;
+
+  const payload = {
+    clone_addr:      `https://github.com/${ghOwner}/${ghRepo}.git`,
+    repo_name:       `${ghOwner}_${ghRepo}_github`,
+    repo_owner:      destOwner,
+    service:         'github',
+    mirror:          true,
+    mirror_interval: interval,
+    description:     `Mirror of ${ghOwner}/${ghRepo} (GitHub)`,
+    private:         false,
+  };
+
+  document.querySelectorAll('.cap-cb').forEach(cb => {
+    payload[cb.dataset.key] = cb.checked;
+  });
+
+  return { payload, giteaUrl };
+}
+
+function renderJson(obj) {
+  const lines = JSON.stringify(obj, null, 2).split('\n');
+  return lines.map(line => {
+    return line
+      .replace(/"([^"]+)":/g, '<span class="j-key">"$1"</span>:')
+      .replace(/: "([^"]*)"/g, ': <span class="j-str">"$1"</span>')
+      .replace(/: (true|false)/g, ': <span class="j-bool">$1</span>')
+      .replace(/: (\d+)/g, ': <span class="j-num">$1</span>');
+  }).join('\n');
+}
+
+let payloadPrevKeys = new Set();
+
+function updatePayload() {
+  const { payload } = getPayload();
+  const newKeys = new Set(Object.keys(payload));
+  const addedKeys = [...newKeys].filter(k => !payloadPrevKeys.has(k));
+
+  const container = document.getElementById('payload-json');
+  container.innerHTML = renderJson(payload);
+
+  // Flash new lines
+  if (addedKeys.length > 0 && payloadPrevKeys.size > 0) {
+    const lines = container.querySelectorAll('span.j-key');
+    lines.forEach(span => {
+      const key = span.textContent.replace(/"/g,'');
+      if (addedKeys.includes(key)) {
+        span.closest('div') || span.parentElement.classList.add('j-new');
+      }
+    });
+  }
+  payloadPrevKeys = newKeys;
+}
+
+// Wire live updates
+['p-gitea-url','p-owner','p-gh-owner','p-gh-repo','p-interval'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePayload);
+});
+document.querySelectorAll('.cap-cb').forEach(cb => {
+  cb.addEventListener('change', updatePayload);
+});
+updatePayload();
+
+// ════════════════════════════════════════════════════════════════════════
+// SCENE 4 — Button Injection
+// ════════════════════════════════════════════════════════════════════════
+
+const INJECT_STEPS = [
+  { n:'1', desc: '<strong>Guard check</strong> — if <code>#gtm-group</code> already exists, return immediately to prevent duplicates.' },
+  { n:'2', desc: '<strong>Create group</strong> — a <code>&lt;span id="gtm-group"&gt;</code> wrapping both buttons as inline-flex.' },
+  { n:'3', desc: '<strong>findTarget()</strong> — try 5 CSS selectors for GitHub\'s action bar; fall back to fixed position.' },
+  { n:'4', desc: '<strong>Inject into DOM</strong> — wrap in a <code>&lt;li&gt;</code> and prepend to the actions list.' },
+  { n:'5', desc: '<strong>Chevron visibility</strong> — hidden by default; revealed via <code>has-chevron</code> class after first mirror.' },
+  { n:'6', desc: '<strong>Click handlers</strong> — main button routes to <code>quickMirror()</code> or <code>openFirstRunModal()</code>.' },
+];
+
+const stepsContainer = document.getElementById('inject-steps');
+INJECT_STEPS.forEach((s, i) => {
+  const el = document.createElement('div');
+  el.className = 'inject-step';
+  el.id = `is-${i}`;
+  el.innerHTML = `<div class="step-num">${s.n}</div><div class="step-desc">${s.desc}</div>`;
+  el.addEventListener('click', () => highlightInjStep(i));
+  stepsContainer.appendChild(el);
+});
+
+function highlightInjStep(i) {
+  document.querySelectorAll('.inject-step').forEach((el,j) => {
+    el.classList.toggle('active', j === i);
+  });
+}
+
+let injRunning = false;
+async function runInjection() {
+  if (injRunning) return;
+  injRunning = true;
+  document.getElementById('gtm-inject-group').classList.remove('visible');
+  document.querySelectorAll('.inject-step').forEach(el => el.classList.remove('active'));
+
+  await sleep(100);
+  for (let i = 0; i < INJECT_STEPS.length; i++) {
+    highlightInjStep(i);
+    if (i === 3) {
+      document.getElementById('gtm-inject-group').classList.add('visible');
+    }
+    await sleep(700);
+  }
+  document.querySelectorAll('.inject-step').forEach(el => el.classList.remove('active'));
+  injRunning = false;
+}
+
+function resetInjection() {
+  document.getElementById('gtm-inject-group').classList.remove('visible');
+  document.getElementById('gtm-main-btn').className = '';
+  document.getElementById('gtm-main-btn').innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg> Mirror to Gitea`;
+  document.querySelectorAll('.inject-step').forEach(el => el.classList.remove('active'));
+}
+
+// State simulation
+document.getElementById('sb-reset').addEventListener('click', () => {
+  const btn = document.getElementById('gtm-main-btn');
+  btn.className = '';
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg> Mirror to Gitea`;
+  document.getElementById('gtm-inject-group').classList.add('visible');
+});
+document.getElementById('sb-loading').addEventListener('click', () => {
+  const btn = document.getElementById('gtm-main-btn');
+  btn.className = 'state-loading';
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg> Mirroring…`;
+  document.getElementById('gtm-inject-group').classList.add('visible');
+});
+document.getElementById('sb-success').addEventListener('click', () => {
+  const btn = document.getElementById('gtm-main-btn');
+  btn.className = 'state-success';
+  btn.innerHTML = `✓ Mirrored`;
+  document.getElementById('gtm-inject-group').classList.add('visible');
+});
+document.getElementById('sb-error').addEventListener('click', () => {
+  const btn = document.getElementById('gtm-main-btn');
+  btn.className = 'state-error';
+  btn.innerHTML = `✗ 409: already exists…`;
+  document.getElementById('gtm-inject-group').classList.add('visible');
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// SCENE 5 — Full Flow
+// ════════════════════════════════════════════════════════════════════════
+
+const FLOWS = {
+  happy: {
+    title: 'Happy path (returning user, public repo)',
+    nodes: [
+      { indent:0, cls:'fn', text:'document-idle → init()', result:'' },
+      { indent:1, cls:'fn', text:'detectProvider()', result:'→ github' },
+      { indent:1, cls:'fn', text:'provider.getRepoInfo()', result:'→ { owner:"torvalds", repo:"linux" }' },
+      { indent:1, cls:'fn', text:'isConfigured()', result:'→ true' },
+      { indent:1, cls:'fn', text:'injectSplitButton(provider, quickMirror, …, true)', result:'' },
+      { indent:0, cls:'info', text:'[ user clicks "Mirror to Gitea" ]', result:'' },
+      { indent:1, cls:'fn', text:'quickMirror(provider)', result:'' },
+      { indent:2, cls:'fn', text:'provider.isRepoPrivate()', result:'→ false' },
+      { indent:2, cls:'fn', text:'executeMirror(provider, repo, cfg, btn)', result:'' },
+      { indent:3, cls:'fn', text:'buildDefaultPayload()', result:'→ { clone_addr, repo_name, … }' },
+      { indent:3, cls:'api', text:'giteaRequest(POST /api/v1/repos/migrate)', result:'' },
+      { indent:4, cls:'api', text:'GM_xmlhttpRequest(…) — bypasses CORS', result:'' },
+      { indent:3, cls:'fn', text:'markConfigured() + showChevron()', result:'' },
+      { indent:3, cls:'ok',  text:'resetBtn("success", "✓ Mirrored", 4000)', result:'button → green' },
+    ]
+  },
+  firstrun: {
+    title: 'First-run: user has not configured Gitea yet',
+    nodes: [
+      { indent:0, cls:'fn', text:'init()', result:'' },
+      { indent:1, cls:'fn', text:'isConfigured()', result:'→ false' },
+      { indent:1, cls:'fn', text:'injectSplitButton(…, openFirstRunModal, …, false)', result:'chevron hidden' },
+      { indent:0, cls:'info', text:'[ user clicks "Mirror to Gitea" ]', result:'' },
+      { indent:1, cls:'fn', text:'openFirstRunModal(provider)', result:'' },
+      { indent:2, cls:'info', text:'Modal: Gitea URL, API Token, Owner, Interval', result:'' },
+      { indent:0, cls:'info', text:'[ user fills form + clicks "Save & Mirror" ]', result:'' },
+      { indent:2, cls:'fn', text:'saveConfig(cfg)', result:'' },
+      { indent:2, cls:'fn', text:'buildDefaultPayload(provider, repo, cfg)', result:'' },
+      { indent:2, cls:'api', text:'giteaRequest(POST /api/v1/repos/migrate)', result:'' },
+      { indent:2, cls:'fn', text:'markConfigured() + showChevron()', result:'chevron appears' },
+      { indent:2, cls:'ok',  text:'setStatus("success", "Mirror created!")', result:'' },
+    ]
+  },
+  private: {
+    title: 'Private repository — one-time token prompt',
+    nodes: [
+      { indent:0, cls:'info', text:'[ user clicks "Mirror to Gitea" on a private repo ]', result:'' },
+      { indent:1, cls:'fn', text:'quickMirror(provider)', result:'' },
+      { indent:2, cls:'fn', text:'provider.isRepoPrivate()', result:'→ true' },
+      { indent:2, cls:'fn', text:'promptForToken(provider, repo, cfg)', result:'' },
+      { indent:3, cls:'info', text:'Modal: "Private Repo — enter GitHub PAT (not saved)"', result:'' },
+      { indent:0, cls:'info', text:'[ user enters token + clicks "Mirror" ]', result:'' },
+      { indent:2, cls:'fn', text:'executeMirror(…, authToken)', result:'' },
+      { indent:3, cls:'fn', text:'buildDefaultPayload()', result:'' },
+      { indent:3, cls:'info', text:'payload.auth_token = token  (in-memory only)', result:'' },
+      { indent:3, cls:'api', text:'giteaRequest(POST /api/v1/repos/migrate)', result:'' },
+      { indent:3, cls:'ok',  text:'✓ Token discarded — never written to GM storage', result:'' },
+    ]
+  },
+  spa: {
+    title: 'SPA navigation — Turbo replaces page content',
+    nodes: [
+      { indent:0, cls:'fn', text:'const observer = new MutationObserver(callback)', result:'' },
+      { indent:0, cls:'fn', text:'observer.observe(document.body, { childList:true, subtree:true })', result:'' },
+      { indent:0, cls:'info', text:'[ user clicks a GitHub internal link (Turbo navigation) ]', result:'' },
+      { indent:1, cls:'info', text:'Turbo replaces <body> content — #gtm-group is removed', result:'' },
+      { indent:1, cls:'fn', text:'MutationObserver fires callback()', result:'' },
+      { indent:2, cls:'fn', text:'!document.getElementById("gtm-group") && !isInitializing', result:'→ true' },
+      { indent:2, cls:'fn', text:'init() — re-runs full setup', result:'' },
+      { indent:3, cls:'fn', text:'detectProvider() → getRepoInfo()', result:'validates new URL' },
+      { indent:3, cls:'fn', text:'injectSplitButton(…)', result:'button re-injected' },
+      { indent:0, cls:'ok',  text:'Guard in injectSplitButton prevents duplicates', result:'idempotent ✓' },
+    ]
+  }
+};
+
+let currentFlow = 'happy';
+let flowTimer = null;
+let flowStep = 0;
+let flowNodes = [];
+
+function buildCallStack(flowKey) {
+  const flow = FLOWS[flowKey];
+  const container = document.getElementById(`cs-${flowKey}`);
+  container.innerHTML = '';
+  flow.nodes.forEach((node, i) => {
+    const div = document.createElement('div');
+    div.className = 'call-node';
+    div.id = `cn-${flowKey}-${i}`;
+
+    let indentHtml = '';
+    for (let d = 0; d < node.indent; d++) {
+      indentHtml += `<div class="call-indent"></div>`;
+    }
+
+    div.innerHTML = `
+      ${indentHtml}
+      <div class="call-box ${node.cls}">
+        <span>${esc(node.text)}</span>
+        ${node.result ? `<span class="call-result">${esc(node.result)}</span>` : ''}
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+Object.keys(FLOWS).forEach(k => buildCallStack(k));
+
+async function playFlow(flowKey) {
+  if (flowTimer) { clearTimeout(flowTimer); flowTimer = null; }
+  const flow = FLOWS[flowKey];
+  const nodes = document.querySelectorAll(`#cs-${flowKey} .call-node`);
+  nodes.forEach(n => n.classList.remove('visible'));
+
+  const prog = document.getElementById('flow-progress');
+  const label = document.getElementById('flow-step-label');
+  const total = flow.nodes.length;
+
+  for (let i = 0; i < total; i++) {
+    nodes[i].classList.add('visible');
+    prog.style.width = `${((i+1)/total)*100}%`;
+    label.textContent = `step ${i+1} / ${total}`;
+    // scroll into view
+    nodes[i].scrollIntoView({ behavior:'smooth', block:'nearest' });
+    await sleep(340);
+  }
+}
+
+function selectFlow(key) {
+  currentFlow = key;
+  document.querySelectorAll('.flow-tab').forEach(t => t.classList.toggle('active', t.dataset.flow === key));
+  document.querySelectorAll('.flow-view').forEach(v => v.classList.toggle('active', v.id === `flow-${key}`));
+  document.getElementById('flow-progress').style.width = '0%';
+  document.getElementById('flow-step-label').textContent = `step 0 / ${FLOWS[key].nodes.length}`;
+  // Reset visibility
+  document.querySelectorAll(`#cs-${key} .call-node`).forEach(n => n.classList.remove('visible'));
+}
+
+document.querySelectorAll('.flow-tab').forEach(tab => {
+  tab.addEventListener('click', () => selectFlow(tab.dataset.flow));
+});
+
+document.getElementById('play-flow').addEventListener('click', () => playFlow(currentFlow));
+
+// Init scene 5
+selectFlow('happy');
+
+// ════════════════════════════════════════════════════════════════════════
+// Keyboard nav
+// ════════════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goScene(currentScene + 1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   goScene(currentScene - 1);
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (currentScene === 0) runPipeline();
+    if (currentScene === 4) playFlow(currentFlow);
+  }
+});
+</script>
+</body>
+</html>
