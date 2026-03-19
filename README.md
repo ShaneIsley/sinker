@@ -1,3 +1,5 @@
+![Sinker Logo](sinkers.png)
+
 # Sinker
 
 A userscript that adds a one-click mirror button to GitHub repository pages. Clone any repo — including issues, PRs, releases, wiki, and LFS — straight to your Gitea instance without leaving GitHub.
