@@ -1,4 +1,6 @@
-![Sinker Logo](sinkers.png)
+<p align="center">
+  <img src="sinkers.png" width="320" />
+</p>
 
 # Sinker
 
